@@ -1,11 +1,11 @@
 require 'uri'
 
 module DAV4Rack
-  
+
   class Controller
     include DAV4Rack::HTTPStatus
     include DAV4Rack::Utils
-    
+
     attr_reader :request, :response, :resource
 
     # request:: Rack::Request
@@ -14,54 +14,60 @@ module DAV4Rack
     # Create a new Controller.
     # NOTE: options will be passed to Resource
     def initialize(request, response, options={})
+      pc("Controller#initialize", "", "red")
       raise Forbidden if request.path_info.include?('..')
       @request = request
       @response = response
       @options = options
-      
+
       @dav_extensions = options.delete(:dav_extensions) || []
       @always_include_dav_header = options.delete(:always_include_dav_header)
-      
+
       @resource = resource_class.new(actual_path, implied_path, @request, @response, @options)
-      
+
       if(@always_include_dav_header)
         add_dav_header
       end
     end
-    
+
     # s:: string
     # Escape URL string
     def url_format(resource)
+      pc("Controller#url_format", "", "red")
       ret = URI.escape(resource.public_path)
       if resource.collection? and ret[-1,1] != '/'
         ret += '/'
       end
       ret
     end
-    
+
     # s:: string
     # Unescape URL string
     def url_unescape(s)
+      pc("Controller#url_unescape", "", "red")
       URI.unescape(s)
     end
-    
+
     def add_dav_header
+      pc("Controller#add_dav_header", "", "red")
       unless(response['Dav'])
         dav_support = %w(1 2) + @dav_extensions
         response['Dav'] = dav_support.join(', ')
       end
     end
-    
+
     # Return response to OPTIONS
     def options
+      pc("Controller#options", "", "red")
       add_dav_header
       response['Allow'] = 'OPTIONS,HEAD,GET,PUT,POST,DELETE,PROPFIND,PROPPATCH,MKCOL,COPY,MOVE,LOCK,UNLOCK'
       response['Ms-Author-Via'] = 'DAV'
       OK
     end
-    
+
     # Return response to HEAD
     def head
+      pc("Controller#head", "", "red")
       if(resource.exist?)
         response['Etag'] = resource.etag
         response['Content-Type'] = resource.content_type
@@ -71,9 +77,10 @@ module DAV4Rack
         NotFound
       end
     end
-    
+
     # Return response to GET
     def get
+      pc("Controller#get", "", "red")
       if(resource.exist?)
         res = resource.get(request, response)
         if(res == OK && !resource.collection?)
@@ -90,6 +97,7 @@ module DAV4Rack
 
     # Return response to PUT
     def put
+      pc("Controller#put", "", "red")
       if(resource.collection?)
         Forbidden
       elsif(!resource.parent_exists? || !resource.parent_collection?)
@@ -105,11 +113,13 @@ module DAV4Rack
 
     # Return response to POST
     def post
+      pc("Controller#post", "", "red")
       resource.post(request, response)
     end
 
     # Return response to DELETE
     def delete
+      pc("Controller#delete", "", "red")
       if(resource.exist?)
         resource.lock_check if resource.supports_locking?
         resource.delete
@@ -117,9 +127,10 @@ module DAV4Rack
         NotFound
       end
     end
-    
+
     # Return response to MKCOL
     def mkcol
+      pc("Controller#mkcol", "", "red")
       resource.lock_check if resource.supports_locking?
       status = resource.make_collection
       gen_url = "#{scheme}://#{host}:#{port}#{url_format(resource)}" if status == Created
@@ -135,9 +146,10 @@ module DAV4Rack
         status
       end
     end
-    
+
     # Return response to COPY
     def copy
+      pc("Controller#copy", "", "red")
       move(:copy)
     end
 
@@ -145,6 +157,7 @@ module DAV4Rack
     # Move Resource to new location. If :copy is provided,
     # Resource will be copied (implementation ease)
     def move(*args)
+      pc("Controller#move", "", "red")
       unless(resource.exist?)
         NotFound
       else
@@ -180,9 +193,10 @@ module DAV4Rack
         end
       end
     end
-    
+
     # Return response to PROPFIND
     def propfind
+      pc("Controller#propfind", "", "red")
       unless(resource.exist?)
         NotFound
       else
@@ -205,6 +219,7 @@ module DAV4Rack
               end
               hsh
             }.compact
+            pc("Controller#propfind properties", properties)
           else
             raise BadRequest
           end
@@ -223,9 +238,10 @@ module DAV4Rack
         end
       end
     end
-    
+
     # Return response to PROPPATCH
     def proppatch
+      pc("Controller#proppatch", "", "red")
       unless(resource.exist?)
         NotFound
       else
@@ -264,8 +280,9 @@ module DAV4Rack
 
     # Lock current resource
     # NOTE: This will pass an argument hash to Resource#lock and
-    # wait for a success/failure response. 
+    # wait for a success/failure response.
     def lock
+      pc("Controller#lock", "", "red")
       lockinfo = request_document.xpath("//#{ns}lockinfo")
       asked = {}
       asked[:timeout] = request.env['Timeout'].split(',').map{|x|x.strip} if request.env['Timeout']
@@ -319,6 +336,7 @@ module DAV4Rack
 
     # Unlock current resource
     def unlock
+      pc("Controller#unlock", "", "red")
       resource.unlock(lock_token)
     end
 
@@ -326,6 +344,7 @@ module DAV4Rack
     # NOTE: Authentication will only be performed if the Resource
     # has defined an #authenticate method
     def authenticate
+      pc("Controller#authenticate", "", "red")
       authed = true
       if(resource.respond_to?(:authenticate, true))
         authed = false
@@ -342,64 +361,75 @@ module DAV4Rack
       end
       raise Unauthorized unless authed
     end
-    
+
     private
 
     # Request environment variables
     def env
+      pc("Controller#env", "", "red")
       @request.env
     end
-    
+
     # Current request scheme (http/https)
     def scheme
+      pc("Controller#scheme", "", "red")
       request.scheme
     end
-    
+
     # Request host
     def host
+      pc("Controller#host", "", "red")
       request.host
     end
-    
+
     # Request port
     def port
+      pc("Controller#port", "", "red")
       request.port
     end
-    
+
     # Class of the resource in use
     def resource_class
+      pc("Controller#resource_class", "", "red")
       @options[:resource_class]
     end
 
     # Root URI path for the resource
     def root_uri_path
+      pc("Controller#root_uri_path", "", "red")
       @options[:root_uri_path]
     end
-    
+
     # Returns Resource path with root URI removed
     def implied_path
+      pc("Controller#implied_path", "", "red")
       clean_path(@request.path.dup)
     end
-    
+
     # x:: request path
     # Unescapes path and removes root URI if applicable
     def clean_path(x)
+      pc("Controller#clean_path", "", "red")
       ip = url_unescape(x)
       ip.gsub!(/^#{Regexp.escape(root_uri_path)}/, '') if root_uri_path
       ip
     end
-    
+
     # Unescaped request path
     def actual_path
+      pc("Controller#actual_path", "", "red")
       url_unescape(@request.path.dup)
     end
 
     # Lock token if provided by client
     def lock_token
+      pc("Controller#lock_token", "", "red")
       env['HTTP_LOCK_TOKEN'] || nil
     end
-    
+
     # Requested depth
     def depth
+      pc("Controller#depth", "", "red")
       d = env['HTTP_DEPTH']
       if(d =~ /^\d+$/)
         d = d.to_i
@@ -411,16 +441,19 @@ module DAV4Rack
 
     # Current HTTP version being used
     def http_version
+      pc("Controller#http_version", "", "red")
       env['HTTP_VERSION'] || env['SERVER_PROTOCOL'] || 'HTTP/1.0'
     end
-    
+
     # Overwrite is allowed
     def overwrite
+      pc("Controller#overwrite", "", "red")
       env['HTTP_OVERWRITE'].to_s.upcase != 'F'
     end
 
     # Find resources at depth requested
     def find_resources(with_current_resource=true)
+      pc("Controller#find_resources", "", "red")
       ary = nil
       case depth
       when 0
@@ -432,9 +465,11 @@ module DAV4Rack
       end
       with_current_resource ? [resource] + ary : ary
     end
-    
+
     # XML parsed request
     def request_document
+      pc("Controller#request_document", "", "red")
+
       @request_document ||= Nokogiri.XML(request.body.read)
     rescue
       raise BadRequest
@@ -443,6 +478,7 @@ module DAV4Rack
     # Namespace being used within XML document
     # TODO: Make this better
     def ns(wanted_uri="DAV:")
+      pc("Controller#ns", "", "red")
       _ns = ''
       if(request_document && request_document.root && request_document.root.namespace_definitions.size > 0)
         _ns = request_document.root.namespace_definitions.collect{|__ns| __ns if __ns.href == wanted_uri}.compact
@@ -454,12 +490,15 @@ module DAV4Rack
         end
         _ns += ':' unless _ns.empty?
       end
+      pc("Controller#ns _ns", _ns)
       _ns
     end
-    
+
     # root_type:: Root tag name
     # Render XML and set Rack::Response#body= to final XML
     def render_xml(root_type)
+      pc("Controller#render_xml", "", "red")
+      pc("Controller#render_xml root_xml_attributes", resource.root_xml_attributes)
       raise ArgumentError.new 'Expecting block' unless block_given?
       doc = Nokogiri::XML::Builder.new do |xml_base|
         xml_base.send(root_type.to_s, {'xmlns:D' => 'DAV:'}.merge(resource.root_xml_attributes)) do
@@ -468,7 +507,7 @@ module DAV4Rack
           yield xml
         end
       end
-     
+
       if(@options[:pretty_xml])
         response.body = doc.to_xml
       else
@@ -479,19 +518,21 @@ module DAV4Rack
       response["Content-Type"] = 'text/xml; charset="utf-8"'
       response["Content-Length"] = response.body.size.to_s
     end
-      
+
     # block:: block
     # Creates a multistatus response using #render_xml and
     # returns the correct status
     def multistatus(&block)
+      pc("Controller#multistatus", "", "red")
       render_xml(:multistatus, &block)
       MultiStatus
     end
-    
+
     # xml:: Nokogiri::XML::Builder
     # errors:: Array of errors
     # Crafts responses for errors
     def response_errors(xml, errors)
+      pc("Controller#response_errors", "", "red")
       for path, status in errors
         xml.response do
           xml.href "#{scheme}://#{host}:#{port}#{URI.escape(path)}"
@@ -504,6 +545,7 @@ module DAV4Rack
     # elements:: Property hashes (name, ns_href, children)
     # Returns array of property values for given names
     def get_properties(resource, elements)
+      pc("Controller#get_properties", "", "red")
       stats = Hash.new { |h, k| h[k] = [] }
       for element in elements
         begin
@@ -522,6 +564,7 @@ module DAV4Rack
     # elements:: Property hashes (name, namespace, children)
     # Removes the given properties from a resource
     def rm_properties(resource, elements)
+      pc("Controller#rm_properties", "", "red")
       for element, value in elements
         resource.remove_property(element)
       end
@@ -531,6 +574,7 @@ module DAV4Rack
     # elements:: Property hashes (name, namespace, children)
     # Sets the given properties
     def set_properties(resource, elements)
+      pc("Controller#set_properties", "", "red")
       stats = Hash.new { |h, k| h[k] = [] }
       for element, value in elements
         begin
@@ -543,17 +587,19 @@ module DAV4Rack
       end
       stats
     end
-    
+
     # xml:: Nokogiri::XML::Builder
     # stats:: Array of stats
     # Build propstats response
     def propstats(xml, stats)
+      pc("Controller#propstats", "", "red")
       return if stats.empty?
       for status, props in stats
         xml.propstat do
           xml.prop do
             for element, value in props
               defn = xml.doc.root.namespace_definitions.find{|ns_def| ns_def.href == element[:ns_href]}
+
               if defn.nil?
                 if element[:ns_href] and not element[:ns_href].empty?
                   _ns = "unknown#{rand(65536)}"
@@ -588,14 +634,15 @@ module DAV4Rack
         end
       end
     end
-    
+
     # xml:: Nokogiri::XML::Builder
     # element:: Nokogiri::XML::Element
     # Converts element into proper text
     def xml_convert(xml, element)
+      pc("Controller#xml_convert", "", "red")
       xml.doc.root.add_child(element)
     end
 
   end
 
-end 
+end
